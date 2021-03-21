@@ -154,10 +154,14 @@ typedef struct {
 typedef struct {
     unsigned int SP1: 8; // 8 bit
 } CAN_DD_AnalogOutputsT;
+
+
 #define bool unsigned char
 #define true 1
 #define false 0
-int skt; // CAN-Socket
+
+
+
 
 // --- Types ---
 enum STATE {
@@ -166,6 +170,7 @@ enum STATE {
 
 // --- Variables ---
 enum STATE enState = stINIT;
+int skt; // CAN-Socket
 
 unsigned int nTime = 0;
 unsigned int nStateChanged = 0;
@@ -176,6 +181,8 @@ unsigned long sCycleCounter = 0;
 unsigned long sLastEvent1000 = 0;
 
 
+
+// --- Functions ---
 bool SetLed(bool pValueRed, bool pValueYellow, bool pValueGreen, bool pValueSignal) {
     struct can_frame frame;
     int bytes_sent;
@@ -274,13 +281,14 @@ int main(int argc, char *argv[]) {
                 CAN_TK_PeriodicInputsT *pInputs = (CAN_TK_PeriodicInputsT *) frame.data;
 
                 if (!tInputs->SW1) { // falling edge event
-                    button = 1;
+                    button = 1; // Button Pressed
                 }
             } else if (frame.can_id == TK_PERIODIC_INPUTS_1) {
                 CAN_TK_PeriodicInputsT *tInputs = (CAN_TK_PeriodicInputsT *) frame.data;
-                timeRV2 = (((tInputs->RV2 * 10) / 1023) + 5);
+                timeRV2 = (((tInputs->RV2 * 10) / 1023) + 5); //set the Time for the Green LED
             }
         }
+       
         if (sCycleCounter - sLastEvent1000 >= 700) {
             sLastEvent1000 = sCycleCounter;
             nTime += 1;
