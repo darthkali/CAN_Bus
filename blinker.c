@@ -154,10 +154,12 @@ typedef struct {
 typedef struct {
     unsigned int SP1: 8; // 8 bit
 } CAN_DD_AnalogOutputsT;
+
+
 #define bool unsigned char
 #define true 1
 #define false 0
-int skt; // CAN-Socket
+
 
 // --- Types ---
 enum DIRECTION {
@@ -174,18 +176,19 @@ enum INDICATOR {
 enum DIRECTION direction = LEFT;
 enum MODE mode = SINGLE;
 
+int skt; // CAN-Socket
 unsigned int nTime = 0;
 unsigned int nStateChanged = 0;
 unsigned int button = 0;
 unsigned int timeRV2 = 0;
 
 unsigned long sCycleCounter = 0;
-unsigned long sLastEventMain = 0;
-unsigned long sLastEventFast = 0;
+unsigned long sLastEvent = 0;
 unsigned int interval = 0;
 
 int blinkLightMM1[8];
 int blinkLightMM2[8];
+
 unsigned int mmLeftMode = 0;
 unsigned int mmLeftMultiple = 0;
 unsigned int mmLeftDirection = 0;
@@ -205,7 +208,8 @@ void setArrayToNull(int *array) {
 
 void setBlink(int mmDirection, int mmMode, int mmMultiple, int *blinkLightArray) {
 
-    if (!mmMode) {
+    
+    if (!mmMode) { // Simple Blink-Mode
         if (countMM < 4) {
             for (int i = 0; i <= 7; i++) {
                 blinkLightArray[i] = 1;
@@ -215,22 +219,22 @@ void setBlink(int mmDirection, int mmMode, int mmMultiple, int *blinkLightArray)
                 blinkLightArray[i] = 0;
             }
         }
-    } else if (mmDirection == 0) {
+    } else if (mmDirection == 0) { //Running Light Left to Right
         switch (countMM) {
             case 1:
                 blinkLightArray[0] = 1;
                 break;
-            case 0:
+            case 0: 
                 setArrayToNull(blinkLightArray);
                 break;
             default:
                 for (int i = 7; i >= 0; i--) {
                     blinkLightArray[i] = blinkLightArray[i - 1];
                 }
-                blinkLightArray[0] = mmMultiple;
+                blinkLightArray[0] = mmMultiple; // Single or Strip
                 break;
         }
-    } else {
+    } else {//Running Light Right to Left
         switch (countMM) {
             case 1:
                 blinkLightArray[7] = 1;
@@ -242,13 +246,15 @@ void setBlink(int mmDirection, int mmMode, int mmMultiple, int *blinkLightArray)
                 for (int i = 0; i < 7; i++) {
                     blinkLightArray[i] = blinkLightArray[i + 1];
                 }
-                blinkLightArray[7] = mmMultiple;
+                blinkLightArray[7] = mmMultiple; // Single or Strip
                 break;
         }
     }
 }
 
+//reset all LED´s 
 void stopIndicator() {
+
     struct can_frame frame;
     int bytes_sent;
 
@@ -276,6 +282,7 @@ void stopIndicator() {
     setArrayToNull(blinkLightMM1);
     setArrayToNull(blinkLightMM2);
 }
+
 
 void setMM(enum INDICATOR indicator) {
 
@@ -319,12 +326,9 @@ void setMM(enum INDICATOR indicator) {
 bool switchTK_RL1() {
     struct can_frame frame;
     int bytes_sent;
-
-    // ---------------------------------------------
+    
     // TinkerKit
-    // ---------------------------------------------
     CAN_TK_DigitalOutputsT tTKDOutputs;
-
 
     if (countMM < 4) {
         tTKDOutputs.RL1 = 1;
@@ -373,8 +377,7 @@ int main(int argc, char *argv[]) {
 
             if (frame.can_id == DD_PERIODIC_INPUTS_1) {
                 CAN_DD_PeriodicInputsT *tInputs = (CAN_DD_PeriodicInputsT *) frame.data;
-                interval = ((tInputs->RV6 * 3000) / 1023) + 1000;
-                printf("Input: %d \r\n", interval);
+                interval = ((tInputs->RV6 * 3000) / 1023) + 1000; //calc the correct frequence: 0 - 1023 bit -> 1Hz - 4Hz
             } else if (frame.can_id == DD_TRIGGERED_INPUTS_1) {
                 CAN_DD_TriggeredInputsT *tInputs = (CAN_DD_TriggeredInputsT *) frame.data;
 
@@ -397,13 +400,13 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if (sCycleCounter - sLastEventFast >= interval / 54) {
-            sLastEventFast = sCycleCounter;
+        if (sCycleCounter - sLastEvent >= interval / 54) { //we need every phase 9 Sections (and a adjustmant to have a period from 1 second) 
+            sLastEvent = sCycleCounter;
             if (startIndicator) {
                 setMM(LEFT_INDICATOR);
                 setMM(RIGHT_INDICATOR);
                 switchTK_RL1();
-                countMM = (countMM < 8) ? countMM + 1 : 0;
+                countMM = (countMM < 8) ? countMM + 1 : 0; //count 0 to 8
             }
         }
         usleep(1000); // cycle time 1 ms
